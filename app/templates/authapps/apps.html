@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}WRGV App - My Apps{% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+    <h1>App List</h1>
+</div>
+<div class="col-md-6">
+    <ul class="list-group">
+        {% for app in apps %}
+            <li class="list-group-item">
+                <a href="{{ url_for('main.show_authapp', appID=app.app_ID, _external=True) }}">{{ app.app_name }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.user_login }}'s Profile{% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+    <h1>Profile</h1>
+</div>
+<div class="col-md-6">
+    <form class="form-horizontal">
+        <div class="form-group">
+        <label class="col-sm-4 control-label">User Login</label>
+            <div class="col-sm-8">
+              <p class="form-control-static">{{ user.user_login }}</p>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">User DisplayName</label>
+            <div class="col-sm-8">
+              <p class="form-control-static">{{ user.user_displayname }}</p>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">User Email</label>
+            <div class="col-sm-8">
+              <p class="form-control-static">{{ user.user_email }}</p>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">Register Time</label>
+            <div class="col-sm-8">
+              <p class="form-control-static">{{ user.user_registered }}</p>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-sm-4 control-label">User Status</label>
+            <div class="col-sm-8">
+              <p class="form-control-static">
+                  {% if user.user_confirmed %}
+                  Confirmed
+                  {% else %}
+                  Unconfirmed
+                  {% endif %}
+              </p>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
