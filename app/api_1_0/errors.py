@@ -9,8 +9,8 @@ def bad_request(message):
     return response
 
 
-def unauthorized(message):
-    response = jsonify({'error': 'unauthorized', 'message': message})
+def unauthorized(message, request_token=''):
+    response = jsonify({'error': 'unauthorized', 'message': message, 'request_token': request_token})
     response.status_code = 401
     return response
 

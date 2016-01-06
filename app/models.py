@@ -1,5 +1,7 @@
 import hashlib
+import hmac
 from datetime import datetime
+import time
 from flask import current_app, request, url_for
 from flask.ext.login import UserMixin, AnonymousUserMixin
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
@@ -321,10 +323,12 @@ class Authapp(db.Model):
     app_description = db.Column(db.Text)
     app_status = db.Column(db.Integer, default=0)  # 0: unapproved 1: approved
     app_icon = db.Column(db.Text)
+    access_token = db.Column(db.Text)
+    token_expire = db.Column(db.DateTime, default=datetime.utcfromtimestamp(time.time()+3600*24*30))  # expired in one month
 
     @classmethod
     def generate_app_key(cls):
-        key = ''.join(random.SystemRandom().choice(string.digits) for _ in range(10))
+        key = ''.join(random.SystemRandom().choice(string.digits) for _ in range(9))
         return key
 
     @classmethod
@@ -333,6 +337,44 @@ class Authapp(db.Model):
                 random.randint(10,20)))
         secret = hashlib.md5(secret).hexdigest()
         return secret
+
+    def generate_app_access_token(self, expiration=3600*24*30):
+        s = Serializer(current_app.config['SECRET_KEY'], expires_in=expiration)
+        token = s.dumps({'appid': self.app_ID, 'appkey': self.app_key, 'expiration': expiration}).decode('ascii')
+        self.token_expire = datetime.fromtimestamp(time.time()+expiration)
+        self.access_token = token
+        db.session.add(self)
+        db.session.commit()
+        json_token = {
+            'access_token': token,
+            'expiration': expiration
+        }
+        return
+
+    @staticmethod
+    def verify_app_access_token(token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except Exception:
+            return None
+        authapp = Authapp.query.filter_by(app_ID=int(data['appid']), app_key=int(data['appkey']), access_token=token).first()
+        if authapp.token_expire > datetime.utcnow():
+            return authapp
+        return None
+
+    def verify_token_request_sign(self, timestrap, redirect, sign):
+        if not self.app_secret:
+            return False
+        t = int(time.time())
+        if t-timestrap > 10:
+            return False
+        s = str(self.app_key)+str(timestrap)+redirect;
+        h = hmac.new(self.app_secret)
+        h.update(s)
+        if sign == h.hexdigest():
+            return True
+        return False
 
     def __repr__(self):
         return '<Authapp: %r>' % self.app_name
