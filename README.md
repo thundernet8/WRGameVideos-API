@@ -4,7 +4,7 @@ Supply most model data via RESTFUL API, only JSON supported
 
 ## Third App
 
-* register url - yourapidomain.com//apps/register (need login first)
+* register url - yourapidomain.com/apps/register (need login first)
 * app review - yourapidomain.com/apps/<int:appid>/review (only administrator can approve a app)
 * app list - yourapidomain.com/apps
 * app detail - yourapidomain.com/apps/<int:appid> (you can find ==App Key== and ==App Secret== here)
@@ -15,11 +15,11 @@ Supply most model data via RESTFUL API, only JSON supported
 
 * request url - yourapidomain.com/open/v1.0/access_token (GET method)
 * url parameters
-** grant_type - 'authorization_code'
-** client_id - your app key
-** tstrap - timestrap now (UTC+0)
-** redirect_uri - callback url, must same as the redirect url provided when registered the app
-** sign - a hmac hash string of 'app key+timestrap+redirect url', using App Secret as encrypt key
+* * grant_type - 'authorization_code'
+* * client_id - your app key
+* * tstrap - timestrap now (UTC+0)
+* * redirect_uri - callback url, must same as the redirect url provided when registered the app
+* * sign - a hmac hash string of 'app key+timestrap+redirect url', using App Secret as encrypt key
 
 if everything is ok, return a json string including access_token:
 ```
