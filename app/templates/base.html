@@ -17,8 +17,9 @@
         <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
                 <li><a href="{{ url_for('main.index') }}">Home</a></li>
+                <li><a href="{{ url_for('main.register_app') }}">Register App</a> </li>
                 {% if current_user.is_authenticated %}
-                <li><a href="{{ url_for('main.show_user_profile', uid=current_user.user_ID) }}">Profile</a></li>
+                <li><a href="{{ url_for('main.show_my_apps') }}">My Apps</a> </li>
                 {% endif %}
             </ul>
             <ul class="nav navbar-nav navbar-right">
@@ -29,6 +30,7 @@
                         Account <b class="caret"></b>
                     </a>
                     <ul class="dropdown-menu">
+                        <li><a href="{{ url_for('main.show_user_profile', uid=current_user.user_ID) }}">Profile</a></li>
                         <li><a href="{{ url_for('auth.change_password') }}">Change Password</a></li>
                         <li><a href="{{ url_for('auth.change_email_request') }}">Change Email</a></li>
                         <li><a href="{{ url_for('auth.logout') }}">Log Out</a></li>

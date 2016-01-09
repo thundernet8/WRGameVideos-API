@@ -42,6 +42,9 @@ def deploy():
     # create user roles
     Role.insert_roles()
 
+    # create default categories
+    Taxonomy.insert_categories()
+
 
 if __name__ == '__main__':
     manager.run()

@@ -1,3 +1,4 @@
+# coding=utf-8
 import hashlib
 import hmac
 from datetime import datetime
@@ -38,7 +39,7 @@ class Role(db.Model):
         }
         for r in roles:
             role = Role.query.filter_by(name=r).first()
-            if  role is None:
+            if role is None:
                 role = Role(name=r)
             role.permissions = roles[r]
             db.session.add(role)
@@ -59,6 +60,64 @@ class Taxonomy(db.Model):
     thumb = db.Column(db.Text)
     # relations
     terms = db.relationship('Tax_terms', backref='taxonomy', lazy='dynamic')
+
+    @staticmethod
+    def insert_categories():
+        categories = [
+            {'description': u'《英雄联盟》（简称lol）是由美国Riot Games开发，腾讯游戏运营的英雄对战网游。《英雄联盟》除了即时战略、'
+                            u'团队作战外，还拥有特色的英雄、自动匹配的战网平台，包括天赋树、召唤师系统、符文等元素。',
+             'name': u'英雄联盟',
+             'thumb': 'images/cates/lol.png'
+            },
+            {'description': u'Dota以对立的两个小队展开对战，通常是5v5，正如该游戏名称所表现的，游戏目的是守护自己的远古遗迹（近卫方'
+                            u'的世界之树、天灾方的冰封王座），同时摧毁对方的远古遗迹。为了到达对方的远古遗迹，一方英雄必须战胜对方的'
+                            u'部队、防御建筑和英雄。《DOTA2》，是脱离了其上一代作品《DOTA》所依赖的War3的引擎，由《DOTA》的地图核心'
+                            u'制作者IceFrog（冰蛙）联手美国Valve公司使用他们的Source引擎研发的、Valve运营，完美世界代理（国服），'
+                            u'韩国NEXON代理（韩服）的多人联机对抗RPG',
+             'name': u'Dota/Dota2',
+             'thumb': 'images/cates/dota.png'
+            },
+            {'description': u'《炉石传说：魔兽英雄传》（Hearthstone: Heroes of Warcraft，简称炉石传说）是暴雪娱乐开发的一款集换式'
+                            u'卡牌游戏, 故事背景基于魔兽争霸系列的世界观，玩家可以另行购买卡牌包',
+             'name': u'炉石传说',
+             'thumb': 'images/cates/hs.png'
+            },
+            {'description': u'《风暴英雄》 是由暴雪娱乐公司开发的一款在线多人竞技PC游戏。游戏中的英雄角色主要来自于暴雪三大经典游戏'
+                            u'系列：《魔兽世界》、《暗黑破坏神》和《星际争霸》',
+             'name': u'风暴英雄',
+             'thumb': 'images/cates/sh.png'
+            },
+            {'description': u'《我的世界》(Minecraft)是一款沙盒游戏, 以让每一个玩家在三维空间中自由地创造和破坏不同种类的方块为主体。'
+                            u'玩家在游戏中可以在单人或多人模式中通过摧毁或创造方块以创造精妙绝伦的建筑物和艺术，或者收集物品探索地图以完'
+                            u'成游戏的主线',
+             'name': u'我的世界',
+             'thumb': 'images/cates/mc.png'
+            },
+            {'description': u'《暗黑破坏神》是1996年暴雪公司推出的一款动作RPG经典游戏系列，英文名Diablo，源于西班牙语，意为魔王、恶'
+                            u'魔的意思。玩家可以在五种不同的职业中进行选择，每种职业都有一套独特的魔法和技能。玩家在冒险中可以挑战无'
+                            u'以计数的恶魔、怪物和强大的BOSS，逐渐累积经验，增强能力，并且获得具有神奇力量的物品',
+             'name': u'暗黑破坏神',
+             'thumb': 'images/cates/d3.png'
+            },
+            {'description': u'《魔兽世界》（World of Warcraft）是由著名游戏公司暴雪娱乐所制作的第一款网络游戏，属于大型多人在线角色'
+                            u'扮演游戏。游戏以该公司出品的即时战略游戏《魔兽争霸》的剧情为历史背景，依托魔兽争霸的历史事件和英雄人物，'
+                            u'魔兽世界有着完整的历史背景时间线。玩家在魔兽世界中冒险、完成任务、新的历险、探索未知的世界、征服怪物等',
+             'name': u'魔兽世界',
+             'thumb': 'images/cates/wow.png'
+            },
+            {'description': u'《穿越火线》(Cross Fire)是一款第一人称射击游戏的网络游戏，玩家扮演控制一名持枪战斗人员，与其他玩家进'
+                            u'行械斗。',
+             'name': u'穿越火线',
+             'thumb': 'images/cates/cf.png'
+            },
+        ]
+
+        for c in categories:
+            cate = Taxonomy.query.filter_by(name=c.get('name')).first()
+            if cate is None:
+                cate = Taxonomy(description=c.get('description'), name=c.get('name'), thumb=c.get('thumb'), type='Category')
+            db.session.add(cate)
+        db.session.commit()
 
     def __repr__(self):
         return '<Taxonomy: %r>' % self.type
