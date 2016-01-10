@@ -34,7 +34,7 @@ manager.add_command('db', MigrateCommand)
 def deploy():
     """Run deployment tasks."""
     from flask.ext.migrate import upgrade
-    from app.models import Role, Taxonomy, Tax_terms, Usermeta, User, Video
+    from app.models import Role, Taxonomy, Tax_terms, Usermeta, User, Video, Option
 
     # migrate database to latest revision
     upgrade()

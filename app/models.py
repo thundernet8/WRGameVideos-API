@@ -50,6 +50,7 @@ class Role(db.Model):
 
 
 class Taxonomy(db.Model):
+    """a taxonomy can be a Category, a Tag or a Topic, which is used to created a set for videos"""
     __tablename__ = 'wr_taxonomy'
     taxonomy_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     description = db.Column(db.Text)
@@ -64,6 +65,10 @@ class Taxonomy(db.Model):
     @staticmethod
     def insert_categories():
         categories = [
+            {'description': '',
+             'name': u'默认分类',
+             'thumb': 'images/cates/default.png'
+            },
             {'description': u'《英雄联盟》（简称lol）是由美国Riot Games开发，腾讯游戏运营的英雄对战网游。《英雄联盟》除了即时战略、'
                             u'团队作战外，还拥有特色的英雄、自动匹配的战网平台，包括天赋树、召唤师系统、符文等元素。',
              'name': u'英雄联盟',
@@ -124,6 +129,8 @@ class Taxonomy(db.Model):
 
 
 class Tax_terms(db.Model):
+    """instance items related to a video under taxonomy, one taxnonmy is maybe a Tag, Category or Topic Class, and it
+    can include several terms"""
     __tablename__ = 'wr_terms'
     term_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     video_ID = db.Column(db.Integer, db.ForeignKey('wr_videos.video_ID'))
@@ -438,3 +445,29 @@ class Authapp(db.Model):
     def __repr__(self):
         return '<Authapp: %r>' % self.app_name
 
+
+class Option(db.Model):
+    __tablename__ = 'wr_options'
+    option_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    option_name = db.Column(db.Text)
+    option_value = db.Column(db.Text)
+
+    @staticmethod
+    def get_option(option_name):
+        option = Option.query.filter_by(option_name=option_name).first()
+        if option:
+            return option.option_value
+        return None
+
+    @staticmethod
+    def set_option(option_name, option_value):
+        option = Option.query.filter_by(option_name=option_name).first()
+        if option:
+            option.option_value = option_value
+        else:
+            option = Option(option_name=option_name, option_value=option_value)
+        db.session.add(option)
+        db.session.commit()
+
+    def __repr__(self):
+        return '<Option: %r' % self.option_name
