@@ -1,6 +1,7 @@
 # coding=utf-8
 import hashlib
 import hmac
+import json
 from datetime import datetime
 import time
 from flask import current_app, request, url_for
@@ -471,3 +472,47 @@ class Option(db.Model):
 
     def __repr__(self):
         return '<Option: %r' % self.option_name
+
+
+class Slide(object):
+    """a home page slide, may be a special video or an ad with link"""
+    def __init__(self, **kwargs):
+        self.is_ad = kwargs.get('is_ad', False)
+        self.image = kwargs.get('image', '')
+        self.video_id = kwargs.get('video_id', 0)
+        self.title = kwargs.get('title', '')
+        self.link = kwargs.get('link', '')
+
+    def __repr__(self):
+        return '<Slide: %r>' % self.title
+
+
+class Slides(object):
+    """home page slides"""
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_slides():
+        slide_list = Option.get_option('slides')
+        slide_list = json.loads(slide_list)
+        if not isinstance(slide_list, list):
+            return None
+        slides = []
+        for s in slide_list:
+            is_ad = s.get('is_ad', False)
+            image = s.get('image', '')
+            video_id = s.get('video_id', 0)
+            title = s.get('title', '')
+            link = s.get('link', '')
+            slide = Slide(is_ad=is_ad, image=image, video_id=video_id, title=title, link=link)
+            slides.append(slide)
+        return slides
+
+    @staticmethod
+    def set_slides(slide_list):
+        if not isinstance(slide_list, list):
+            return
+        slide_str = json.dumps(slide_list)
+        Option.set_option('slides', slide_str)
