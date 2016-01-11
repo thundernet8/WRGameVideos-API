@@ -1,9 +1,12 @@
+# coding=utf-8
+
 from . import main
-from flask import url_for, request, redirect, render_template, send_file, flash, abort
+from flask import url_for, request, redirect, render_template, send_file, flash, abort, jsonify
 from .forms import RegisterAppForm, ReviewAppForm
-from ..models import Authapp, User
+from ..models import Authapp, User, Slides, Option
 from flask.ext.login import login_required, current_user
 from .. import db
+import json
 
 
 @main.route('/')
@@ -79,3 +82,9 @@ def show_user_profile(uid):
     if user:
         return render_template('auth/user.html', user=user)
     abort(404)
+
+
+@main.route('/slides')
+def show_slides():
+    s = Slides.get_slides_json()
+    return jsonify(s)

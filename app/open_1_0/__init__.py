@@ -4,4 +4,4 @@ open = Blueprint('open', __name__)
 
 # import
 
-from . import token, errors
+from . import token, errors, login, forms

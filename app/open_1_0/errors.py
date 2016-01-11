@@ -1,5 +1,6 @@
 from flask import jsonify
 
+
 def wrong_grant(message):
     response = jsonify({'error': 'grant_type_error', 'message': message})
     response.status_code = 200
@@ -23,7 +24,20 @@ def unmatched_redirect(message):
     response.status_code = 200
     return response
 
+
 def incorrect_sign(message):
     response = jsonify({'error': 'incorrect_sign', 'message': message})
+    response.status_code = 200
+    return response
+
+
+def incorrect_code(message):
+    response = jsonify({'error': 'incorrect_code', 'message': message})
+    response.status_code = 200
+    return response
+
+
+def incorrect_openid(message):
+    response = jsonify({'error': 'incorrect_openid', 'message': message})
     response.status_code = 200
     return response

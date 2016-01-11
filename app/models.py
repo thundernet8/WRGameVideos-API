@@ -4,7 +4,7 @@ import hmac
 import json
 from datetime import datetime
 import time
-from flask import current_app, request, url_for
+from flask import current_app, request, url_for, g
 from flask.ext.login import UserMixin, AnonymousUserMixin
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -149,6 +149,23 @@ class Usermeta(db.Model):
     meta_key = db.Column(db.Text)
     meta_value = db.Column(db.Text)
 
+    @staticmethod
+    def get_usermeta(user_id, meta_key):
+        meta = Usermeta.query.filter_by(user_ID=user_id, meta_key=meta_key).first()
+        if meta:
+            return meta.meta_value
+        return None
+
+    @staticmethod
+    def set_usermeta(user_id, meta_key, meta_value):
+        meta = Usermeta.query.filter_by(user_ID=user_id, meta_key=meta_key).first()
+        if meta:
+            meta.meta_value = meta_value
+        else:
+            meta = Usermeta(user_ID=user_id, meta_key=meta_key, meta_value=meta_value)
+        db.session.add(meta)
+        db.session.commit()
+
     def __repr__(self):
         return '<Usermeta: %r>' % self.meta_key
 
@@ -167,6 +184,8 @@ class User(UserMixin, db.Model):
     user_activation_key = db.Column(db.Text)
     user_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     role_id = db.Column(db.Integer, db.ForeignKey('wr_roles.role_ID'))
+    open_id = db.Column(db.Text)
+
     # relations
     usermetas = db.relationship('Usermeta', backref='user', lazy='dynamic')
     videos = db.relationship('Video', backref='user', lazy='dynamic')
@@ -182,6 +201,10 @@ class User(UserMixin, db.Model):
         # avatar
         if self.user_email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(self.user_email.encode('utf-8')).hexdigest()
+
+        # openid
+        if self.open_id is None:
+            self.open_id = ''.join(random.SystemRandom().choice(string.digits + string.ascii_uppercase) for _ in range(10))
 
     def get_id(self):
         try:
@@ -329,6 +352,39 @@ class User(UserMixin, db.Model):
             return None
         return User.query.get(int(data['id']))  # query by primary key
 
+    def generate_user_access_token(self, expiration=3600*24*30, app_key=''):
+        s = Serializer(current_app.config['SECRET_KEY'], expires_in=expiration)
+        token = s.dumps({'appkey': app_key, 'openid': self.open_id, 'expiration': expiration}).decode('ascii')
+        token_expire = int(time.time()+expiration)
+        token_key = 'access_token_'+str(app_key)
+        token_expire_key = 'access_token_expire_'+str(app_key)
+        Usermeta.set_usermeta(self.user_ID, token_key, token)
+        Usermeta.set_usermeta(self.user_ID, token_expire_key, str(token_expire))
+        json_token = {
+            'access_token': token,
+            'open_id': self.open_id,
+            'expiration': expiration
+        }
+        return json_token
+
+    @staticmethod
+    def verify_user_access_token(token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except Exception:
+            return None
+        authapp = Authapp.query.filter_by(app_key=int(data['appkey'])).first()
+        user = User.query.filter_by(open_id=data['openid']).first()
+        if user is None:
+            return None
+        token_expire = int(Usermeta.get_usermeta(user.user_ID, 'access_token_expire'))
+        if token_expire > int(time.time()):
+            g.current_user = user
+            g.current_authapp = authapp
+            return dict(authapp=authapp, user=user)
+        return None
+
     def __repr__(self):
         return '<User %r>' % self.user_login
 
@@ -339,6 +395,9 @@ def load_user(user_id):
 
 
 class AnonymousUser(AnonymousUserMixin):
+    def get_id(self):
+        return 0
+
     def can(self, permissions):
         return False
 
@@ -405,7 +464,7 @@ class Authapp(db.Model):
         secret = hashlib.md5(secret).hexdigest()
         return secret
 
-    def generate_app_access_token(self, expiration=3600*24*30):
+    def generate_app_access_token(self, expiration=3600*24*30*12):
         s = Serializer(current_app.config['SECRET_KEY'], expires_in=expiration)
         token = s.dumps({'appid': self.app_ID, 'appkey': self.app_key, 'expiration': expiration}).decode('ascii')
         self.token_expire = datetime.fromtimestamp(time.time()+expiration)
@@ -416,7 +475,7 @@ class Authapp(db.Model):
             'access_token': token,
             'expiration': expiration
         }
-        return
+        return json_token
 
     @staticmethod
     def verify_app_access_token(token):
@@ -427,7 +486,30 @@ class Authapp(db.Model):
             return None
         authapp = Authapp.query.filter_by(app_ID=int(data['appid']), app_key=int(data['appkey']), access_token=token).first()
         if authapp.token_expire > datetime.utcnow():
-            return authapp
+            g.current_authapp = authapp
+            g.current_user = AnonymousUser
+            return dict(authapp=authapp, user=AnonymousUser)
+        return None
+
+    # user login and authorize third app, the timed code is used by third app to get access_token and user open_id
+    def generate_timed_code(self, expiration=60*10, open_id=''):
+        s = Serializer(current_app.config['SECRET_KEY'], expires_in=expiration)
+        code = s.dumps({'appkey': self.app_key, 'openid': open_id, 'expiration': expiration}).decode('ascii')
+        return code
+
+    @staticmethod
+    def verify_timed_code(code):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(code)
+        except Exception:
+            return None
+        authapp = Authapp.query.filter_by(app_key=int(data['appkey']), app_status=1).first()
+        user = User.query.filter_by(open_id=data['openid']).first()
+        if authapp and user:
+            open_id = user.open_id
+            access_token = authapp.generate_app_access_token(open_id=open_id)
+            return dict(access_token=access_token, open_id=open_id)
         return None
 
     def verify_token_request_sign(self, timestrap, redirect, sign):
@@ -511,8 +593,24 @@ class Slides(object):
         return slides
 
     @staticmethod
+    def get_slides_json():
+        s = []
+        slide_list = Option.get_option('slides')
+        slide_list = json.loads(slide_list)
+        for slide in slide_list:
+            dic = {
+                'is_ad': slide.get('is_ad', False),
+                'image': slide.get('image', ''),
+                'video_id': slide.get('video_id', 0),
+                'title': slide.get('title', ''),
+                'link': slide.get('link', '')
+            }
+            s.append(dic)
+        return {'slides': s}
+
+    @staticmethod
     def set_slides(slide_list):
         if not isinstance(slide_list, list):
             return
-        slide_str = json.dumps(slide_list)
+        slide_str = json.dumps(slide_list).decode('raw_unicode_escape')
         Option.set_option('slides', slide_str)

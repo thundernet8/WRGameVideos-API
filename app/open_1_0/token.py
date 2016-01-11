@@ -6,6 +6,11 @@ from ..models import Authapp
 
 @open.route('/access_token', methods=['GET', 'POST'])
 def get_access_token():
+    """get access token for registered app
+    it is only used for anonymous user, not single for a user,
+    the access_token is stored in 'Authapp' table, every third app has one,
+    if you need to access API data specified to a user, go visit /user_token to get one user_access_token
+    """
     grant = request.args.get('grant_type')
     if not grant or grant != 'authorization_code':
         return wrong_grant('grant type does not match')
@@ -25,5 +30,6 @@ def get_access_token():
     if authapp.app_url != redirect_url:
         return unmatched_redirect('redirect url error')
     if authapp.verify_token_request_sign(strap, redirect_url, sign):
-        return jsonify(authapp.generate_app_access_token())
+        open_id = request.args.get('openid', '')
+        return jsonify(authapp.generate_app_access_token(open_id=open_id))
     return incorrect_sign('signature error')
