@@ -363,6 +363,7 @@ class User(UserMixin, db.Model):
         json_token = {
             'access_token': token,
             'open_id': self.open_id,
+            'nickname': self.user_displayname or self.user_login,
             'expiration': expiration
         }
         return json_token
@@ -374,11 +375,14 @@ class User(UserMixin, db.Model):
             data = s.loads(token)
         except Exception:
             return None
+        if not data.get('openid'):
+            return None
         authapp = Authapp.query.filter_by(app_key=int(data['appkey'])).first()
         user = User.query.filter_by(open_id=data['openid']).first()
         if user is None:
             return None
-        token_expire = int(Usermeta.get_usermeta(user.user_ID, 'access_token_expire'))
+        token_expire_key = 'access_token_expire_'+str(data['appkey'])
+        token_expire = int(Usermeta.get_usermeta(user.user_ID, token_expire_key))
         if token_expire > int(time.time()):
             g.current_user = user
             g.current_authapp = authapp
@@ -483,6 +487,8 @@ class Authapp(db.Model):
         try:
             data = s.loads(token)
         except Exception:
+            return None
+        if not data.get('appid'):
             return None
         authapp = Authapp.query.filter_by(app_ID=int(data['appid']), app_key=int(data['appkey']), access_token=token).first()
         if authapp.token_expire > datetime.utcnow():

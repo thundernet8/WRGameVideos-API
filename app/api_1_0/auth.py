@@ -9,8 +9,13 @@ from app.open_1_0 import open
 def before_request():
 
     """verify third app token"""
-    if request.endpoint[:21] != 'open.get_access_token':
-        h = request.headers
-        token = h.get('X-TOKEN', None) or request.args.get('access_token')
-        if token is None or not Authapp.verify_app_access_token(token):
-            return unauthorized('Invalid access_token', url_for('open.get_access_token', _external=True))
+    h = request.headers
+    token = h.get('X-TOKEN', None) or request.args.get('access_token')
+    if token is None:
+        return unauthorized('Missing access_token', url_for('open.get_access_token', _external=True))
+    verify = Authapp.verify_app_access_token(token) or User.verify_user_access_token(token)
+    if verify:
+        g.current_authapp = verify.get('authapp')
+        g.current_user = verify.get('user')
+    else:
+        return unauthorized('Invalid access_token', url_for('open.get_access_token', _external=True))
