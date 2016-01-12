@@ -1,8 +1,14 @@
 from flask import jsonify
 
 
-def wrong_grant(message):
+def incorrect_grant_type(message):
     response = jsonify({'error': 'grant_type_error', 'message': message})
+    response.status_code = 200
+    return response
+
+
+def incorrect_response_type(message):
+    response = jsonify({'error': 'response_type_error', 'message': message})
     response.status_code = 200
     return response
 

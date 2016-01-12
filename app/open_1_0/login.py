@@ -5,21 +5,23 @@ from flask import url_for
 from flask import render_template
 from flask import redirect
 from flask import request
-from flask import g
 from flask import jsonify
 from flask.ext.login import current_user
 from flask.ext.login import login_user
+from flask.ext.login import current_user
 
 from . import open
 from .errors import incorrect_sign
 from .errors import incorrect_openid
-from .errors import wrong_grant
+from .errors import incorrect_grant_type
+from .errors import incorrect_response_type
 from .errors import unknown_app
 from .errors import unapproved_app
 from .errors import unmatched_redirect
 from .errors import incorrect_code
 from forms import OpenLoginForm
 from ..models import User
+from ..models import AnonymousUser
 from ..models import Authapp
 
 
@@ -29,6 +31,34 @@ def open_authorize():
     third app which has registered in this api website and got appkey&appsecret
     can use the account system to login to its own website
     """
+
+    response_type = request.args.get('response_type')
+    appkey = request.args.get('client_id')
+    redirect_url = request.args.get('redirect_url', '')
+    stamp = request.args.get('tstamp', 0)
+    sign = request.args.get('sign', '')
+
+    # state arg used for client to verify request from server
+    state = request.args.get('state', '')
+
+    # check required data in request args
+    if response_type != 'code':
+        return render_template('open/authorize_error.html', msg='incorrect response type')
+
+    if not appkey:
+        return render_template('open/authorize_error.html', msg='unregistered application')
+
+    authapp = Authapp.query.filter_by(app_key=appkey, app_status=1).first()
+    if not authapp:
+        return render_template('open/authorize_error.html', msg='unregistered application')
+    elif not authapp.app_status:
+        return render_template('open/authorize_error.html', msg='unapproved application')
+
+    if authapp.app_url != redirect_url[:len(authapp.app_url)]:
+        return render_template('open/authorize_error.html', msg='redirect_url is missing or unmatched')
+
+    if not authapp.verify_token_request_sign(stamp, redirect_url, sign):
+        return render_template('open/authorize_error.html', msg='signature error')
 
     form = OpenLoginForm()
     if form.validate_on_submit():
@@ -41,36 +71,12 @@ def open_authorize():
             # add state to redirect_uri - avoid fake redirect
             # add access_token to redirect_uri
 
-            code = g.authapp.generate_timed_code(user.open_id)
-            redirect_url = request.args.get('redirect_uri') or url_for('main.index')
-            redirect_url = redirect_url+'&'+urllib.urlencode({'code': code, 'state': g.state}) if r'?' in redirect_url \
-                else redirect_url+'?'+urllib.urlencode({'code': code, 'state': g.state})
-            return redirect(redirect_url)
-
-    appkey = request.args.get('client_id')
-    redirect_url = request.args.get('redirect_uri', '')
-    strap = request.args.get('tstrap', 0)
-    sign = request.args.get('sign', '')
-
-    # state arg used for client to verify request from server
-    state = request.args.get('state', '')
-
-    # check required data in request args
-    if not appkey:
-        return render_template('open/authorize_error.html', msg='unregistered application')
-    authapp = Authapp.query.filter_by(app_key=appkey, app_status=1).first()
-    if not authapp:
-        return render_template('open/authorize_error.html', msg='unregistered application')
-    elif not authapp.app_status:
-        return render_template('open/authorize_error.html', msg='unapproved application')
-
-    if authapp.app_url != redirect_url[:len(authapp.app_url)]:
-        return render_template('open/authorize_error.html', msg='redirect_url is missing or unmatched')
-    if not authapp.verify_token_request_sign(strap, redirect_url, sign):
-        return render_template('open/authorize_error.html', msg='signature error')
-
-    g.authapp = authapp
-    g.state = state
+    if current_user.is_authenticated:
+        code = authapp.generate_timed_code(open_id=current_user.open_id)
+        redirect_url = request.args.get('redirect_url') or url_for('main.index')
+        redirect_url = redirect_url+'&'+urllib.urlencode({'code': code, 'state': state}) if r'?' in redirect_url \
+            else redirect_url+'?'+urllib.urlencode({'code': code, 'state': state})
+        return redirect(redirect_url)
 
     return render_template('open/authorize.html', form=form)
 
@@ -87,7 +93,7 @@ def get_token():
     redirect_url = request.args.get('redirect_url')
 
     if not grant or grant != 'authorization_code':
-        return wrong_grant('grant type does not match')
+        return incorrect_grant_type('grant type does not match')
 
     if not app_key:
         return unknown_app('unregistered application')
@@ -109,11 +115,11 @@ def get_token():
 
     # or getting token again with open_id, client_id, sign
     sign = request.args.get('sign')
-    timestrap = request.args.get('tstrap')
+    timestamp = request.args.get('tstamp')
     open_id = request.args.get('openid')
     user = User.query.filter_by(open_id=open_id).first()
     if not user:
         return incorrect_openid('open_id is incorrect')
-    if authapp.verify_token_request_sign(timestrap, redirect_url, sign):
+    if authapp.verify_token_request_sign(timestamp, redirect_url, sign):
         return jsonify(user.generate_user_access_token(app_key=app_key))
     return incorrect_sign('signature error')

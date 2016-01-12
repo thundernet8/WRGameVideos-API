@@ -508,18 +508,19 @@ class Authapp(db.Model):
         user = User.query.filter_by(open_id=data['openid']).first()
         if authapp and user:
             open_id = user.open_id
-            access_token = authapp.generate_app_access_token(open_id=open_id)
-            return dict(access_token=access_token, open_id=open_id)
+            app_key = authapp.app_key
+            access_token_json = user.generate_user_access_token(app_key=app_key)
+            return access_token_json
         return None
 
-    def verify_token_request_sign(self, timestrap, redirect, sign):
+    def verify_token_request_sign(self, timestamp, redirect, sign):
         if not self.app_secret:
             return False
         t = int(time.time())
-        if t-timestrap > 10:
+        if t-int(timestamp) > 100:
             return False
-        s = str(self.app_key)+str(timestrap)+redirect;
-        h = hmac.new(self.app_secret)
+        s = str(self.app_key)+str(timestamp)+redirect
+        h = hmac.new(str(self.app_secret))
         h.update(s)
         if sign == h.hexdigest():
             return True

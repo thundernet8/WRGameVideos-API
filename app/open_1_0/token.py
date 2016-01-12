@@ -1,5 +1,5 @@
 from . import open
-from .errors import wrong_grant, unknown_app, unapproved_app, unmatched_redirect, incorrect_sign
+from .errors import unknown_app, unapproved_app, unmatched_redirect, incorrect_sign, incorrect_grant_type
 from flask import url_for, render_template, redirect, request, flash, current_app, jsonify
 from ..models import Authapp
 
@@ -13,7 +13,7 @@ def get_access_token():
     """
     grant = request.args.get('grant_type')
     if not grant or grant != 'authorization_code':
-        return wrong_grant('grant type does not match')
+        return incorrect_grant_type('grant type does not match')
 
     appkey = request.args.get('client_id')
     if not appkey:
