@@ -1,6 +1,6 @@
 from . import open
 from .errors import unknown_app, unapproved_app, unmatched_redirect, incorrect_sign, incorrect_grant_type
-from flask import url_for, render_template, redirect, request, flash, current_app, jsonify
+from flask import url_for, render_template, redirect, request, current_app, jsonify
 from ..models import Authapp
 
 
@@ -24,12 +24,11 @@ def get_access_token():
     elif not authapp.app_status:
         return unapproved_app('unapproved application')
 
-    redirect_url = request.args.get('redirect_uri', '')
-    strap = request.args.get('tstrap', 0)
-    sign = request.args.get('sign', '')
-    if authapp.app_url != redirect_url:
+    redirect_url = request.args.get('redirect_url')
+    stamp = request.args.get('tstamp', 0)
+    sign = request.args.get('sign')
+    if authapp.app_url != redirect_url[:len(authapp.app_url)]:
         return unmatched_redirect('redirect url error')
-    if authapp.verify_token_request_sign(strap, redirect_url, sign):
-        open_id = request.args.get('openid', '')
-        return jsonify(authapp.generate_app_access_token(open_id=open_id))
+    if authapp.verify_token_request_sign(stamp, redirect_url, sign):
+        return jsonify(authapp.generate_app_access_token())
     return incorrect_sign('signature error')

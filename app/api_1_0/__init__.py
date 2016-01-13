@@ -4,4 +4,4 @@ api = Blueprint('api', __name__)
 
 # import
 
-from . import auth, errors, users, authapps
+from . import auth, errors, users, authapps, slides
