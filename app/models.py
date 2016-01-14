@@ -138,6 +138,15 @@ class Tax_terms(db.Model):
     taxonomy_ID = db.Column(db.Integer, db.ForeignKey('wr_taxonomy.taxonomy_ID'))
     # type = db.Column(db.String(64), nullable=False, default='Tag')  # Tag/Category/Topic
 
+    @staticmethod
+    def insert_term(taxonomy_ID, video_ID):
+        term = Tax_terms.query.filter_by(taxonomy_ID=taxonomy_ID, video_ID=video_ID).first()
+        if term:
+            return
+        term = Tax_terms(taxonomy_ID=taxonomy_ID, video_ID=video_ID)
+        db.session.add(term)
+        db.session.commit()
+
     def __repr__(self):
         return '<Tax_term: %r, Video_ID: %r>' % self.taxonomy.type, self.video_ID
 
@@ -433,7 +442,52 @@ class Video(db.Model):
     # relations
     terms = db.relationship('Tax_terms', backref='video', lazy='dynamic')
 
-    # get video info ...
+    # insert video record
+    @classmethod
+    def insert_video(cls, video_author, video_title, video_description, video_link, video_vid, video_cover, video_duration, video_sd_urls, video_hd_urls, video_uhd_urls, video_from):
+        video = Video.query.filter_by(video_link=video_link).first()
+        if not video:
+            video = Video(video_link=video_link)
+        video.video_author = video_author
+        video.video_title = video_title
+        video.video_description = video_description
+        video.video_vid = video_vid
+        video.video_cover = video_cover
+        video.video_duration = video_duration
+        video.video_sd_urls = video_sd_urls
+        video.video_hd_urls = video_hd_urls
+        video.video_uhd_urls = video_uhd_urls
+        video.video_from = video_from
+
+        db.session.add(video)
+        db.session.commit()
+
+    # get video json data
+    @staticmethod
+    def get_cate_videos_json(taxonomy_ID, limit=20, offset=0):
+        s = []
+        # videos = db.session.query(Video).select_from(Tax_terms).filter_by(taxonomy_ID=taxonomy_ID).join(Video, Tax_terms.video_ID == Video.video_ID)
+        videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).filter(Tax_terms.taxonomy_ID == taxonomy_ID, Video.video_status == 'normal').all()
+        for video in videos:
+            dic = {
+                'video_id': video.video_ID,
+                'video_author': video.video_author,
+                'video_date': video.video_date,
+                'video_title': video.video_title,
+                'video_description': video.video_description,
+                'video_link': video.video_link,
+                'video_vid': video.video_vid,
+                'video_cover': video.video_cover,
+                'video_duration': video.video_duration,
+                'video_sd_urls': video.video_sd_urls,
+                'video_hd_urls': video.video_hd_urls,
+                'video_uhd_urls': video.video_uhd_urls,
+                'video_from': video.video_from,
+                'video_score': video.video_score,
+                'video_play_count': video.video_play_count
+            }
+            s.append(dic)
+        return {'videos': s, 'count': len(videos)}
 
     def __repr__(self):
         return '<Video: %r>' % self.video_title
