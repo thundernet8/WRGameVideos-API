@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 import os
 COV = None  # coverage
 if os.environ.get('WRGV_COVERAGE'):
@@ -67,6 +68,68 @@ def test(coverage=False):
         COV.html_report(directory=covdir)
         print('HTML version: file://%s/index.html' % covdir)
         COV.erase()
+
+
+from HTMLParser import HTMLParser
+class Li(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.classes = []
+        self.images = []
+        self.titles = []
+        self.urls = []
+
+        self.is_li = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'li' and attrs:
+            self.is_li = True
+
+        if tag == 'a' and attrs and self.is_li:
+            for key, value in attrs:
+                if key == 'href':
+                    self.urls.append(value)
+                if key == 'title':
+                    self.titles.append(value)
+        if tag == 'img' and attrs and self.is_li:
+            #print(attrs)
+            for key, value in attrs:
+                if key == 'data-echo':
+                    self.images.append(value)
+            self.is_li = False
+
+
+
+
+@manager.command
+def add():
+    import urllib2
+    import random
+    url = 'http://m.v.huya.com/lol/jiaoxue.html'
+    req = urllib2.Request(url)
+    res = urllib2.urlopen(req)
+    r = res.read()
+    li = Li()
+    li.feed(r)
+    li.close()
+
+
+    m = 0
+    #print str(li.titles[0])
+    l = min(len(li.titles), len(li.images), len(li.urls))
+    for i in range(l):
+        score = random.choice(range(20, 100))
+        count = random.choice(range(1000))
+        title = str(li.titles[m]).decode('utf-8')
+        video = Video(video_author=1, video_link=li.urls[m], video_title=title, video_description=title,
+                      video_cover=li.images[m], video_duration=2000, video_status='normal',
+                      video_from='huya', video_score=score, video_star_count=count)
+        term = Tax_terms(video_ID=m+243, taxonomy_ID=14)
+        db.session.add(video)
+        db.session.add(term)
+        m += 1
+    db.session.commit()
+
 
 
 if __name__ == '__main__':

@@ -162,7 +162,7 @@ class Taxonomy(db.Model):
         for c in cates:
             cate = Taxonomy.query.filter_by(name=c.get('name'), parent=c.get('parent')).first()
             if cate is None:
-                cate = Taxonomy(name=c.get('name'), parent=c.get('parent'))
+                cate = Taxonomy(name=c.get('name'), parent=c.get('parent'), type='Category')
             db.session.add(cate)
         db.session.commit()
 
@@ -569,6 +569,7 @@ class Video(db.Model):
     def get_recommended_vides_json(video_ID, count=10):
         """get recommended videos of a video"""
         taxs = db.session.query(Tax_terms.taxonomy_ID).filter_by(video_ID=video_ID).all()
+        taxs = zip(*taxs)[0]
         videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).filter\
             (Tax_terms.taxonomy_ID.in_(taxs[0]), Video.video_ID != video_ID).order_by(func.random()).limit(count).all()
         s = []
@@ -593,15 +594,13 @@ class Video(db.Model):
     @staticmethod
     def get_channel_videos_json(channel_id):
         """get sub-categories including their videos data for the channel"""
-        sub_taxs = db.session.query(Taxonomy.taxonomy_ID, Taxonomy.name).filter_by(parent=channel_id)
+        sub_taxs = db.session.query(Taxonomy.taxonomy_ID, Taxonomy.name).filter_by(parent=channel_id).all()
         if sub_taxs and len(sub_taxs):
-            sub_tax_ids = sub_taxs[0]
-            sub_tax_names = sub_taxs[1]
             channels = []
             i = 0
-            for tax in sub_tax_ids:
+            for tax in sub_taxs:
                 videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID)\
-                    .filter(Tax_terms.taxonomy_ID == tax).limit(20).all()
+                    .filter(Tax_terms.taxonomy_ID == tax[0]).limit(20).all()
                 s = []
                 for video in videos:
                     dic = {
@@ -619,10 +618,10 @@ class Video(db.Model):
                         'video_play_count': video.video_play_count
                     }
                     s.append(dic)
-                channel = dict(taxonomy_id=sub_tax_ids[i], name=sub_tax_names[i], videos=s)
+                channel = dict(taxonomy_id=tax[0], name=tax[1], videos=s)
                 channels.append(channel)
                 i += 1
-            return {'status': True, 'channels': channels, 'count': i+1}
+            return {'status': True, 'channels': channels, 'count': i}
         return {'status': False, 'channels': None, 'count': 0}
 
     def __repr__(self):

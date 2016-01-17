@@ -43,4 +43,4 @@ def get_channel_videos(channel_id):
     """a big category which includes several sub-categories could be a channel, so it's different from a simple
     category"""
     channel_data = Video.get_channel_videos_json(channel_id)
-    return jsonpify(channel_data)
+    return jsonify(channel_data)
