@@ -4,13 +4,22 @@ import hmac
 import json
 from datetime import datetime
 import time
-from flask import current_app, request, url_for, g
-from flask.ext.login import UserMixin, AnonymousUserMixin
+import random
+import string
+import base64
+from sqlalchemy import func
+
+from flask import current_app
+from flask import g
+from flask.ext.login import UserMixin
+from flask.ext.login import AnonymousUserMixin
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash
+
 from app.exceptions import ValidationError
-from app import db, login_manager
-import random, string
+from app import db
+from app import login_manager
 
 
 class Permission:
@@ -122,6 +131,38 @@ class Taxonomy(db.Model):
             cate = Taxonomy.query.filter_by(name=c.get('name')).first()
             if cate is None:
                 cate = Taxonomy(description=c.get('description'), name=c.get('name'), thumb=c.get('thumb'), type='Category')
+            db.session.add(cate)
+        db.session.commit()
+
+    @staticmethod
+    def insert_sub_cates():
+        cates = [
+            {
+                'name': u'联赛视频',
+                'parent': 2
+            },
+            {
+                'name': u'解说视频',
+                'parent': 2
+            },
+            {
+                'name': u'英雄视频',
+                'parent': 2
+            },
+            {
+                'name': u'娱乐视频',
+                'parent': 2
+            },
+            {
+                'name': u'教学视频',
+                'parent': 2
+            }
+        ]
+
+        for c in cates:
+            cate = Taxonomy.query.filter_by(name=c.get('name'), parent=c.get('parent')).first()
+            if cate is None:
+                cate = Taxonomy(name=c.get('name'), parent=c.get('parent'))
             db.session.add(cate)
         db.session.commit()
 
@@ -436,7 +477,8 @@ class Video(db.Model):
     video_uhd_urls = db.Column(db.Text)
     video_status = db.Column(db.Text, nullable=False, default='normal')  # normal/banned
     video_from = db.Column(db.Text, nullable=False, default='huya')  # huya/uuu9/17173
-    video_score = db.Column(db.Float, nullable=False, default=0.0)
+    video_score = db.Column(db.Integer, nullable=False, default=0, index=True)
+    video_star_count = db.Column(db.Integer, default=0, index=True)
     video_play_count = db.Column(db.Integer, nullable=False, default=0, index=True)
 
     # relations
@@ -444,7 +486,8 @@ class Video(db.Model):
 
     # insert video record
     @classmethod
-    def insert_video(cls, video_author, video_title, video_description, video_link, video_vid, video_cover, video_duration, video_sd_urls, video_hd_urls, video_uhd_urls, video_from):
+    def insert_video(cls, video_author, video_title, video_description, video_link, video_vid, video_cover,
+                     video_duration, video_sd_urls, video_hd_urls, video_uhd_urls, video_from):
         video = Video.query.filter_by(video_link=video_link).first()
         if not video:
             video = Video(video_link=video_link)
@@ -462,12 +505,14 @@ class Video(db.Model):
         db.session.add(video)
         db.session.commit()
 
-    # get video json data
     @staticmethod
     def get_cate_videos_json(taxonomy_ID, limit=20, offset=0):
+        """get videos of the specified category"""
         s = []
-        # videos = db.session.query(Video).select_from(Tax_terms).filter_by(taxonomy_ID=taxonomy_ID).join(Video, Tax_terms.video_ID == Video.video_ID)
-        videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).filter(Tax_terms.taxonomy_ID == taxonomy_ID, Video.video_status == 'normal').all()
+        # videos = db.session.query(Video).select_from(Tax_terms).filter_by(taxonomy_ID=taxonomy_ID).\
+        # join(Video, Tax_terms.video_ID == Video.video_ID)
+        videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).\
+            filter(Tax_terms.taxonomy_ID == taxonomy_ID, Video.video_status == 'normal').all()
         for video in videos:
             dic = {
                 'video_id': video.video_ID,
@@ -479,15 +524,106 @@ class Video(db.Model):
                 'video_vid': video.video_vid,
                 'video_cover': video.video_cover,
                 'video_duration': video.video_duration,
-                'video_sd_urls': video.video_sd_urls,
-                'video_hd_urls': video.video_hd_urls,
-                'video_uhd_urls': video.video_uhd_urls,
                 'video_from': video.video_from,
                 'video_score': video.video_score,
                 'video_play_count': video.video_play_count
             }
             s.append(dic)
-        return {'videos': s, 'count': len(videos)}
+        return {'status': True, 'videos': s, 'count': len(videos)}
+
+    @staticmethod
+    def get_video_detail_json(video_ID):
+        """get details of the specified video"""
+        video = Video.query.filter_by(video_ID=video_ID).first()
+        if video:
+            duration = video.video_duration
+            duration_str = str(int(duration/3600))+u' 小时 ' if (duration/3600>0) else ''
+            duration_str += str(int(duration%3600/60))+u' 分钟'
+            dic = {
+                'video_id': video.video_ID,
+                'video_author': video.video_author,
+                'video_date': video.video_date,
+                'video_format_date': video.video_date.strftime('%Y-%m-%d'),
+                'video_title': video.video_title,
+                'video_description': video.video_description,
+                'video_link': video.video_link,
+                'video_link_base64': base64.b64encode(video.video_link),
+                'video_vid': video.video_vid,
+                'video_cover': video.video_cover,
+                'video_duration': video.video_duration,
+                'video_duration_str': duration_str,
+                'video_sd_urls': video.video_sd_urls,
+                'video_hd_urls': video.video_hd_urls,
+                'video_uhd_urls': video.video_uhd_urls,
+                'video_from': video.video_from,
+                'video_score': video.video_score,
+                'video_play_count': video.video_play_count,
+                'video_status': video.video_status,
+                'video_can_download': current_app.config.get('VIDEO_CAN_DOWNLOAD'),
+                'video_play_native': current_app.config.get('VIDEO_PLAY_NATIVE')
+            }
+            return dict(status=True, video=dic)
+        return dict(status=False, video=None)
+
+    @staticmethod
+    def get_recommended_vides_json(video_ID, count=10):
+        """get recommended videos of a video"""
+        taxs = db.session.query(Tax_terms.taxonomy_ID).filter_by(video_ID=video_ID).all()
+        videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).filter\
+            (Tax_terms.taxonomy_ID.in_(taxs[0]), Video.video_ID != video_ID).order_by(func.random()).limit(count).all()
+        s = []
+        for video in videos:
+            dic = {
+                'video_id': video.video_ID,
+                'video_author': video.video_author,
+                'video_date': video.video_date,
+                'video_title': video.video_title,
+                'video_description': video.video_description,
+                'video_link': video.video_link,
+                'video_vid': video.video_vid,
+                'video_cover': video.video_cover,
+                'video_duration': video.video_duration,
+                'video_from': video.video_from,
+                'video_score': video.video_score,
+                'video_play_count': video.video_play_count
+            }
+            s.append(dic)
+        return {'status': True, 'videos': s, 'count': len(videos)}
+
+    @staticmethod
+    def get_channel_videos_json(channel_id):
+        """get sub-categories including their videos data for the channel"""
+        sub_taxs = db.session.query(Taxonomy.taxonomy_ID, Taxonomy.name).filter_by(parent=channel_id)
+        if sub_taxs and len(sub_taxs):
+            sub_tax_ids = sub_taxs[0]
+            sub_tax_names = sub_taxs[1]
+            channels = []
+            i = 0
+            for tax in sub_tax_ids:
+                videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID)\
+                    .filter(Tax_terms.taxonomy_ID == tax).limit(20).all()
+                s = []
+                for video in videos:
+                    dic = {
+                        'video_id': video.video_ID,
+                        'video_author': video.video_author,
+                        'video_date': video.video_date,
+                        'video_title': video.video_title,
+                        'video_description': video.video_description,
+                        'video_link': video.video_link,
+                        'video_vid': video.video_vid,
+                        'video_cover': video.video_cover,
+                        'video_duration': video.video_duration,
+                        'video_from': video.video_from,
+                        'video_score': video.video_score,
+                        'video_play_count': video.video_play_count
+                    }
+                    s.append(dic)
+                channel = dict(taxonomy_id=sub_tax_ids[i], name=sub_tax_names[i], videos=s)
+                channels.append(channel)
+                i += 1
+            return {'status': True, 'channels': channels, 'count': i+1}
+        return {'status': False, 'channels': None, 'count': 0}
 
     def __repr__(self):
         return '<Video: %r>' % self.video_title
@@ -545,7 +681,7 @@ class Authapp(db.Model):
         if not data.get('appid'):
             return None
         authapp = Authapp.query.filter_by(app_ID=int(data['appid']), app_key=int(data['appkey']), access_token=token).first()
-        if authapp.token_expire > datetime.utcnow():
+        if authapp and authapp.token_expire > datetime.utcnow():
             g.current_authapp = authapp
             g.current_user = AnonymousUser
             return dict(authapp=authapp, user=AnonymousUser)

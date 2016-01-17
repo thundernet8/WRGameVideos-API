@@ -44,6 +44,7 @@ def deploy():
 
     # create default categories
     Taxonomy.insert_categories()
+    Taxonomy.insert_sub_cates()
 
 
 @manager.command

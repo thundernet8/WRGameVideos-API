@@ -5,23 +5,12 @@ from flask import url_for
 from flask import render_template
 from flask import redirect
 from flask import request
-from flask import jsonify
-from flask.ext.login import current_user
 from flask.ext.login import login_user
 from flask.ext.login import current_user
 
 from . import open
-from .errors import incorrect_sign
-from .errors import incorrect_openid
-from .errors import incorrect_grant_type
-from .errors import incorrect_response_type
-from .errors import unknown_app
-from .errors import unapproved_app
-from .errors import unmatched_redirect
-from .errors import incorrect_code
 from forms import OpenLoginForm
 from ..models import User
-from ..models import AnonymousUser
 from ..models import Authapp
 
 
@@ -31,7 +20,6 @@ def open_authorize():
     third app which has registered in this api website and got appkey&appsecret
     can use the account system to login to its own website
     """
-
     response_type = request.args.get('response_type')
     appkey = request.args.get('client_id')
     redirect_url = request.args.get('redirect_url', '')
@@ -65,11 +53,6 @@ def open_authorize():
         user = User.query.filter_by(user_email=form.email.data).first()
         if user is not None and user.verify_password(form.password.data):
             login_user(user, False)  # maybe not required
-            # access_token = g.authapp.generate_app_access_token(open_id=user.open_id)
-
-            # add openid to redirect_uri
-            # add state to redirect_uri - avoid fake redirect
-            # add access_token to redirect_uri
 
     if current_user.is_authenticated:
         code = authapp.generate_timed_code(open_id=current_user.open_id)
@@ -79,47 +62,3 @@ def open_authorize():
         return redirect(redirect_url)
 
     return render_template('open/authorize.html', form=form)
-
-
-@open.route('/user_token')
-def get_token():
-    """get an access_token specified to a user and a registered third app,
-    the token is stored in 'Usermeta' table, every user got one for a third app,
-    if you do not access API data related to a specified user, go to visit /access_token for a general app_access_token
-    """
-    code = request.args.get('code')
-    grant = request.args.get('grant_type')
-    app_key = request.args.get('client_id')
-    redirect_url = request.args.get('redirect_url')
-
-    if not grant or grant != 'authorization_code':
-        return incorrect_grant_type('grant type does not match')
-
-    if not app_key:
-        return unknown_app('unregistered application')
-    authapp = Authapp.query.filter_by(app_key=app_key, app_status=1).first()
-    if not authapp:
-        return unknown_app('unregistered application')
-    elif not authapp.app_status:
-        return unapproved_app('unapproved application')
-
-    if authapp.app_url != redirect_url[:len(authapp.app_url)]:
-        return unmatched_redirect('redirect url error')
-
-    # if getting token the first time, check the code arg
-    if code:
-        verify = Authapp.verify_timed_code(code)
-        if verify:
-            return jsonify(verify)
-        return incorrect_code('authorization code error')
-
-    # or getting token again with open_id, client_id, sign
-    sign = request.args.get('sign')
-    timestamp = request.args.get('tstamp')
-    open_id = request.args.get('openid')
-    user = User.query.filter_by(open_id=open_id).first()
-    if not user:
-        return incorrect_openid('open_id is incorrect')
-    if authapp.verify_token_request_sign(timestamp, redirect_url, sign):
-        return jsonify(user.generate_user_access_token(app_key=app_key))
-    return incorrect_sign('signature error')

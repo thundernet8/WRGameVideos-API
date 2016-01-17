@@ -21,6 +21,9 @@ class Config:
     WRGV_COMMENTS_PER_PAGE = 30
     WRGV_SLOW_DB_QUERY_TIME = 0.5
 
+    VIDEO_CAN_DOWNLOAD = True  # for App Store review purpose to set False
+    VIDEO_PLAY_NATIVE = False  # for App Store review purpose to set False
+
     @staticmethod
     def init_app(app):
         pass
