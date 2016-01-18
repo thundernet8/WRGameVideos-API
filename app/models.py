@@ -10,6 +10,7 @@ import base64
 from sqlalchemy import func
 
 from flask import current_app
+from flask import url_for
 from flask import g
 from flask.ext.login import UserMixin
 from flask.ext.login import AnonymousUserMixin
@@ -165,6 +166,25 @@ class Taxonomy(db.Model):
                 cate = Taxonomy(name=c.get('name'), parent=c.get('parent'), type='Category')
             db.session.add(cate)
         db.session.commit()
+
+    @staticmethod
+    def get_taxonomies_json(tax_ids):
+        if tax_ids and len(tax_ids) != 0:
+            taxs = Taxonomy.query.filter(Taxonomy.taxonomy_ID.in_(tax_ids)).all()
+            s = []
+            for tax in taxs:
+                dic = {
+                    'taxnonmy_id': tax.taxonomy_ID,
+                    'name': tax.name,
+                    'cover': url_for('static', filename=tax.thumb, _external=True),
+                    'type': tax.type,
+                    'description': tax.description,
+                    'parnet': tax.parent,
+                    'counts': tax.counts
+                }
+                s.append(dic)
+            return {'status': True, 'count': len(s), 'taxonomies': s}
+        return {'status': False, 'count': 0, 'taxonomies': None}
 
     def __repr__(self):
         return '<Taxonomy: %r>' % self.type
@@ -512,7 +532,7 @@ class Video(db.Model):
         # videos = db.session.query(Video).select_from(Tax_terms).filter_by(taxonomy_ID=taxonomy_ID).\
         # join(Video, Tax_terms.video_ID == Video.video_ID)
         videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).\
-            filter(Tax_terms.taxonomy_ID == taxonomy_ID, Video.video_status == 'normal').all()
+            filter(Tax_terms.taxonomy_ID == taxonomy_ID, Video.video_status == 'normal').order_by(Video.video_ID.desc()).all()
         for video in videos:
             dic = {
                 'video_id': video.video_ID,
@@ -571,7 +591,7 @@ class Video(db.Model):
         taxs = db.session.query(Tax_terms.taxonomy_ID).filter_by(video_ID=video_ID).all()
         taxs = zip(*taxs)[0]
         videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID).filter\
-            (Tax_terms.taxonomy_ID.in_(taxs[0]), Video.video_ID != video_ID).order_by(func.random()).limit(count).all()
+            (Tax_terms.taxonomy_ID.in_(taxs), Video.video_ID != video_ID).order_by(func.random()).limit(count).all()
         s = []
         for video in videos:
             dic = {
@@ -592,7 +612,7 @@ class Video(db.Model):
         return {'status': True, 'videos': s, 'count': len(videos)}
 
     @staticmethod
-    def get_channel_videos_json(channel_id):
+    def get_channel_list_json(channel_id):
         """get sub-categories including their videos data for the channel"""
         sub_taxs = db.session.query(Taxonomy.taxonomy_ID, Taxonomy.name).filter_by(parent=channel_id).all()
         if sub_taxs and len(sub_taxs):
@@ -600,7 +620,7 @@ class Video(db.Model):
             i = 0
             for tax in sub_taxs:
                 videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID)\
-                    .filter(Tax_terms.taxonomy_ID == tax[0]).limit(20).all()
+                    .filter(Tax_terms.taxonomy_ID == tax[0]).order_by(Video.video_ID.desc()).limit(20).all()
                 s = []
                 for video in videos:
                     dic = {
@@ -623,6 +643,38 @@ class Video(db.Model):
                 i += 1
             return {'status': True, 'channels': channels, 'count': i}
         return {'status': False, 'channels': None, 'count': 0}
+
+    @staticmethod
+    def get_channel_video_list_json(channel_id, limit=9, offset=0):
+        """get videos with limit and offset for a channel/category, including its sub-categories"""
+        taxs = db.session.query(Taxonomy.taxonomy_ID).filter_by(parent=channel_id).all()
+        taxs = zip(*taxs)[0]
+        taxs = taxs + (channel_id,)
+        if taxs and len(taxs):
+            s = []
+            i = 0
+            videos = Video.query.join(Tax_terms, Tax_terms.video_ID == Video.video_ID)\
+                    .filter(Tax_terms.taxonomy_ID.in_(taxs)).order_by(Video.video_ID.desc()).\
+                    offset(offset).limit(limit).all()
+            for video in videos:
+                dic = {
+                      'video_id': video.video_ID,
+                    'video_author': video.video_author,
+                    'video_date': video.video_date,
+                    'video_title': video.video_title,
+                    'video_description': video.video_description,
+                    'video_link': video.video_link,
+                    'video_vid': video.video_vid,
+                    'video_cover': video.video_cover,
+                    'video_duration': video.video_duration,
+                    'video_from': video.video_from,
+                    'video_score': video.video_score,
+                    'video_play_count': video.video_play_count
+                }
+                s.append(dic)
+                i += 1
+            return {'status': True, 'videos': s, 'count': len(s), 'offset': offset}
+        return {'status': False, 'videos': None, 'count': 0, 'offset': offset}
 
     def __repr__(self):
         return '<Video: %r>' % self.video_title

@@ -39,8 +39,17 @@ def get_recommended_videos():
 
 
 @api.route('/videos/channel/<int:channel_id>')
-def get_channel_videos(channel_id):
+def get_channel_list(channel_id):
     """a big category which includes several sub-categories could be a channel, so it's different from a simple
     category"""
-    channel_data = Video.get_channel_videos_json(channel_id)
+    channel_data = Video.get_channel_list_json(channel_id)
     return jsonify(channel_data)
+
+
+@api.route('/videos/channel/<int:channel_id>/list')
+def get_channel_video_list(channel_id):
+    """list videos for a channel/category, including its sub-categories, mostly called by ajax"""
+    limit = request.args.get('limit', 9)
+    offset = request.args.get('offset', 0)
+    list_data = Video.get_channel_video_list_json(channel_id, limit, offset)
+    return jsonpify(list_data)  # use jsonp for cross domain
